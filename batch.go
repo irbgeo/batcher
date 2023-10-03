@@ -17,8 +17,6 @@ func (s *batcher) newBatch() *batch {
 		storage: s.storage,
 		keyCh:   make(chan string, s.batchSize),
 	}
-
-	s.ticker.Reset(s.timeout)
 	return b
 }
 
@@ -35,10 +33,6 @@ func (s *batch) addKeyToBatch(key string, resCh chan any, errCh chan error) bool
 }
 
 func (s *batch) process(ctx context.Context) {
-	if len(s.keyCh) == 0 {
-		return
-	}
-
 	keys := make([]string, 0, len(s.keyCh))
 	for len(s.keyCh) > 0 {
 		keys = append(keys, <-s.keyCh)

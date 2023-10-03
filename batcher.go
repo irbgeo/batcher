@@ -46,6 +46,7 @@ func (s *batcher) runtime() {
 
 		go s.processBatch(s.batch)
 
+		s.ticker.Reset(s.timeout)
 		s.batch = s.newBatch()
 
 		s.mu.Unlock()
