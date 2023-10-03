@@ -1,7 +1,6 @@
 package batcher
 
 import (
-	"container/list"
 	"context"
 )
 
@@ -9,16 +8,14 @@ type batch struct {
 	storage storage
 
 	keyCh          chan string
-	resultChanList *list.List
-	errorChanList  *list.List
+	resultChanList []chan any
+	errorChanList  []chan error
 }
 
 func (s *batcher) newBatch() *batch {
 	b := &batch{
-		storage:        s.storage,
-		keyCh:          make(chan string, s.batchSize),
-		resultChanList: list.New(),
-		errorChanList:  list.New(),
+		storage: s.storage,
+		keyCh:   make(chan string, s.batchSize),
 	}
 
 	s.ticker.Reset(s.timeout)
@@ -28,8 +25,8 @@ func (s *batcher) newBatch() *batch {
 func (s *batch) addKeyToBatch(key string, resCh chan any, errCh chan error) bool {
 	select {
 	case s.keyCh <- key:
-		s.resultChanList.PushBack(resCh)
-		s.errorChanList.PushBack(errCh)
+		s.resultChanList = append(s.resultChanList, resCh)
+		s.errorChanList = append(s.errorChanList, errCh)
 	default:
 		return false
 	}
@@ -49,20 +46,19 @@ func (s *batch) process(ctx context.Context) {
 
 	result, err := s.storage.Get(ctx, keys)
 	if err != nil {
-		for e := s.errorChanList.Front(); e != nil; e = e.Next() {
+		for _, ch := range s.errorChanList {
 			select {
-			case e.Value.(chan error) <- err:
+			case ch <- err:
 			default:
 			}
 		}
 		return
 	}
 
-	for _, res := range result {
+	for i, res := range result {
 		select {
-		case s.resultChanList.Front().Value.(chan any) <- res:
+		case s.resultChanList[i] <- res:
 		default:
 		}
-		s.resultChanList.Remove(s.resultChanList.Front())
 	}
 }
