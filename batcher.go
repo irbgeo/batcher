@@ -16,18 +16,20 @@ type batcher struct {
 	batch   *batch
 }
 
+//go:generate mockery --name=storage --structname=Storage
 type storage interface {
-	// необходимая условность: получаемые данные простортированы в соответсвии с порядком ключей
+	// The necessary condition is that the received data is sorted according to the order of keys.
 	Get(ctx context.Context, keys []string) ([]any, error)
 }
 
-func NewBatcher(
+func New(
 	batchSize int,
 	timeout time.Duration,
 	s storage,
 ) *batcher {
 	b := &batcher{
 		batchSize: batchSize,
+		timeout:   timeout,
 		ticker:    time.NewTicker(timeout),
 		storage:   s,
 	}
@@ -42,12 +44,7 @@ func (s *batcher) runtime() {
 	for range s.ticker.C {
 		s.mu.Lock()
 
-		go func(b *batch) {
-			ctx, cancel := context.WithTimeout(context.Background(), batchProcessingTimeout)
-			defer cancel()
-
-			b.process(ctx)
-		}(s.batch)
+		go s.processBatch(s.batch)
 
 		s.batch = s.newBatch()
 
@@ -55,25 +52,22 @@ func (s *batcher) runtime() {
 	}
 }
 
-func (s *batcher) Close() {
+func (s *batcher) Close(ctx context.Context) {
+	s.processBatch(s.batch)
+
 	s.ticker.Stop()
 }
 
+// AddKey to batch and return result or error
 func (s *batcher) AddKey(ctx context.Context, key string) (any, error) {
 	resCh := make(chan any)
 	errCh := make(chan error)
 
 	s.mu.Lock()
 	if err := s.batch.addKeyToBatch(key, resCh, errCh); err != nil {
-		go func(b *batch) {
-			ctx, cancel := context.WithTimeout(context.Background(), batchProcessingTimeout)
-			defer cancel()
-
-			b.process(ctx)
-		}(s.batch)
+		go s.processBatch(s.batch)
 
 		s.batch = s.newBatch()
-
 		s.batch.addKeyToBatch(key, resCh, errCh) // nolint: errcheck
 	}
 	s.mu.Unlock()
@@ -86,4 +80,11 @@ func (s *batcher) AddKey(ctx context.Context, key string) (any, error) {
 	case err := <-errCh:
 		return nil, err
 	}
+}
+
+func (s *batcher) processBatch(b *batch) {
+	ctx, cancel := context.WithTimeout(context.Background(), batchProcessingTimeout)
+	defer cancel()
+
+	b.process(ctx)
 }

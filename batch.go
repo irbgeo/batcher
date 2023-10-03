@@ -25,7 +25,7 @@ func (s *batcher) newBatch() *batch {
 	return b
 }
 
-func (s *batch) addKeyToBatch(key string, resCh <-chan any, errCh <-chan error) error {
+func (s *batch) addKeyToBatch(key string, resCh chan any, errCh chan error) error {
 	select {
 	case s.keyCh <- key:
 		s.resultChanList.PushBack(resCh)
