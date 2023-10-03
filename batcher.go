@@ -46,7 +46,6 @@ func (s *batcher) runtime() {
 
 		go s.processBatch(s.batch)
 
-		s.ticker.Reset(s.timeout)
 		s.batch = s.newBatch()
 
 		s.mu.Unlock()
@@ -66,6 +65,8 @@ func (s *batcher) AddKey(ctx context.Context, key string) (any, error) {
 
 	s.mu.Lock()
 	if !s.batch.addKeyToBatch(key, resCh, errCh) {
+		s.ticker.Reset(s.timeout)
+
 		go s.processBatch(s.batch)
 
 		s.batch = s.newBatch()
