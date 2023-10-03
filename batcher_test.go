@@ -156,9 +156,6 @@ func TestAddKey(t *testing.T) {
 				expectedValue: "test-value-3",
 				expectedError: nil,
 			},
-			func TestAddKeyContext(t *testing.F) {
-				t.A
-			}
 			{
 				key:           "test-case-4",
 				expectedValue: "test-value-4",
