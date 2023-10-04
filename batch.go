@@ -7,38 +7,32 @@ import (
 type batch struct {
 	storage storage
 
-	keyCh          chan string
+	batchSize      int
+	keyList        []string
 	resultChanList []chan any
 	errorChanList  []chan error
 }
 
 func (s *batcher) newBatch() *batch {
 	b := &batch{
-		storage: s.storage,
-		keyCh:   make(chan string, s.batchSize),
+		storage:   s.storage,
+		batchSize: s.batchSize,
+		keyList:   make([]string, s.batchSize),
 	}
 	return b
 }
 
+// addKeyToBatch adds key to batch and return true if batch is full
 func (s *batch) addKeyToBatch(key string, resCh chan any, errCh chan error) bool {
-	select {
-	case s.keyCh <- key:
-		s.resultChanList = append(s.resultChanList, resCh)
-		s.errorChanList = append(s.errorChanList, errCh)
-	default:
-		return false
-	}
+	s.keyList = append(s.keyList, key)
+	s.resultChanList = append(s.resultChanList, resCh)
+	s.errorChanList = append(s.errorChanList, errCh)
 
-	return true
+	return len(s.keyList) == s.batchSize
 }
 
 func (s *batch) process(ctx context.Context) {
-	keys := make([]string, 0, len(s.keyCh))
-	for len(s.keyCh) > 0 {
-		keys = append(keys, <-s.keyCh)
-	}
-
-	result, err := s.storage.Get(ctx, keys)
+	result, err := s.storage.Get(ctx, s.keyList)
 	if err != nil {
 		for _, ch := range s.errorChanList {
 			select {

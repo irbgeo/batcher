@@ -64,13 +64,12 @@ func (s *batcher) AddKey(ctx context.Context, key string) (any, error) {
 	errCh := make(chan error)
 
 	s.mu.Lock()
-	if !s.batch.addKeyToBatch(key, resCh, errCh) {
+	if s.batch.addKeyToBatch(key, resCh, errCh) {
 		s.ticker.Reset(s.timeout)
 
 		go s.processBatch(s.batch)
 
 		s.batch = s.newBatch()
-		s.batch.addKeyToBatch(key, resCh, errCh)
 	}
 	s.mu.Unlock()
 
