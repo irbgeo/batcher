@@ -70,7 +70,7 @@ func (s *batcher) AddKey(ctx context.Context, key string) (any, error) {
 		go s.processBatch(s.batch)
 
 		s.batch = s.newBatch()
-		s.batch.addKeyToBatch(key, resCh, errCh) // nolint: errcheck
+		s.batch.addKeyToBatch(key, resCh, errCh)
 	}
 	s.mu.Unlock()
 
