@@ -10,6 +10,7 @@ type batcher struct {
 	batchSize int
 	timeout   time.Duration
 
+	ch      chan struct{}
 	storage storage
 	mu      sync.Mutex
 	batch   *batch
@@ -30,6 +31,7 @@ func New(
 		batchSize: batchSize,
 		timeout:   timeout,
 		storage:   s,
+		ch:        make(chan struct{}),
 	}
 
 	b.batch = b.newBatch()
@@ -39,14 +41,17 @@ func New(
 }
 
 func (s *batcher) waitBatchClose(b *batch) {
-	<-b.ch
-	s.batch = s.newBatch()
-
-	go s.waitBatchClose(s.batch)
+	select {
+	case <-b.ch:
+		s.batch = s.newBatch()
+		go s.waitBatchClose(s.batch)
+	case <-s.ch:
+	}
 }
 
 func (s *batcher) Close(ctx context.Context) {
-	s.processBatch(s.batch)
+	s.batch.process()
+	close(s.ch)
 }
 
 // AddKey to batch and return result or error
@@ -56,7 +61,7 @@ func (s *batcher) AddKey(ctx context.Context, key string) (any, error) {
 
 	s.mu.Lock()
 	if s.batch.addKeyToBatch(key, resCh, errCh) {
-		go s.processBatch(s.batch)
+		go s.batch.process()
 	}
 	s.mu.Unlock()
 
@@ -68,11 +73,4 @@ func (s *batcher) AddKey(ctx context.Context, key string) (any, error) {
 	case err := <-errCh:
 		return nil, err
 	}
-}
-
-func (s *batcher) processBatch(b *batch) {
-	ctx, cancel := context.WithTimeout(context.Background(), batchProcessingTimeout)
-	defer cancel()
-
-	b.process(ctx)
 }

@@ -22,7 +22,7 @@ type testCase struct {
 
 var (
 	errStorageError = errors.New("storage error")
-	testTimeout     = 10 * time.Second
+	testTimeout     = 5 * time.Second
 
 	testSet = []testCase{
 		{

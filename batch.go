@@ -32,10 +32,7 @@ func (s *batch) runtime() {
 	s.timer = time.NewTimer(s.timeout)
 	<-s.timer.C
 
-	ctx, cancel := context.WithTimeout(context.Background(), batchProcessingTimeout)
-	defer cancel()
-
-	s.process(ctx)
+	s.process()
 }
 
 // addKeyToBatch adds key to batch and return true if batch is full
@@ -51,12 +48,15 @@ func (s *batch) addKeyToBatch(key string, resCh chan any, errCh chan error) bool
 	return len(s.keyList) == s.batchSize
 }
 
-func (s *batch) process(ctx context.Context) {
+func (s *batch) process() {
 	close(s.ch)
 	if len(s.keyList) == 0 {
 		return
 	}
 	s.timer.Stop()
+
+	ctx, cancel := context.WithTimeout(context.Background(), batchProcessingTimeout)
+	defer cancel()
 
 	result, err := s.storage.Get(ctx, s.keyList)
 	if err != nil {
