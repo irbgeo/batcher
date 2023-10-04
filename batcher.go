@@ -10,7 +10,6 @@ type batcher struct {
 	batchSize int
 	timeout   time.Duration
 
-	ticker  *time.Ticker
 	storage storage
 	mu      sync.Mutex
 	batch   *batch
@@ -30,32 +29,24 @@ func New(
 	b := &batcher{
 		batchSize: batchSize,
 		timeout:   timeout,
-		ticker:    time.NewTicker(timeout),
 		storage:   s,
 	}
 
 	b.batch = b.newBatch()
 
-	go b.runtime()
+	go b.waitBatchClose(b.batch)
 	return b
 }
 
-func (s *batcher) runtime() {
-	for range s.ticker.C {
-		s.mu.Lock()
+func (s *batcher) waitBatchClose(b *batch) {
+	<-b.ch
+	s.batch = s.newBatch()
 
-		go s.processBatch(s.batch)
-
-		s.batch = s.newBatch()
-
-		s.mu.Unlock()
-	}
+	go s.waitBatchClose(s.batch)
 }
 
 func (s *batcher) Close(ctx context.Context) {
 	s.processBatch(s.batch)
-
-	s.ticker.Stop()
 }
 
 // AddKey to batch and return result or error
@@ -65,11 +56,7 @@ func (s *batcher) AddKey(ctx context.Context, key string) (any, error) {
 
 	s.mu.Lock()
 	if s.batch.addKeyToBatch(key, resCh, errCh) {
-		s.ticker.Reset(s.timeout)
-
 		go s.processBatch(s.batch)
-
-		s.batch = s.newBatch()
 	}
 	s.mu.Unlock()
 
