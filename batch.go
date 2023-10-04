@@ -10,20 +10,22 @@ type batch struct {
 	timeout   time.Duration
 	batchSize int
 
-	timer          *time.Timer
-	ch             chan struct{}
-	keyList        []string
-	resultChanList []chan any
-	errorChanList  []chan error
+	timer         *time.Timer
+	ch            chan struct{}
+	keyList       []string
+	resultChanMap map[string]chan any
+	errorChanMap  map[string]chan error
 }
 
 func (s *batcher) newBatch() *batch {
 	b := &batch{
-		storage:   s.storage,
-		timeout:   s.timeout,
-		batchSize: s.batchSize,
-		ch:        make(chan struct{}),
-		keyList:   make([]string, 0, s.batchSize),
+		storage:       s.storage,
+		timeout:       s.timeout,
+		batchSize:     s.batchSize,
+		ch:            make(chan struct{}),
+		keyList:       make([]string, 0, s.batchSize),
+		resultChanMap: make(map[string]chan any),
+		errorChanMap:  make(map[string]chan error),
 	}
 	return b
 }
@@ -38,8 +40,8 @@ func (s *batch) runtime() {
 // addKeyToBatch adds key to batch and return true if batch is full
 func (s *batch) addKeyToBatch(key string, resCh chan any, errCh chan error) bool {
 	s.keyList = append(s.keyList, key)
-	s.resultChanList = append(s.resultChanList, resCh)
-	s.errorChanList = append(s.errorChanList, errCh)
+	s.resultChanMap[key] = resCh
+	s.errorChanMap[key] = errCh
 
 	if len(s.keyList) == 1 {
 		go s.runtime()
@@ -60,7 +62,7 @@ func (s *batch) process() {
 
 	result, err := s.storage.Get(ctx, s.keyList)
 	if err != nil {
-		for _, ch := range s.errorChanList {
+		for _, ch := range s.errorChanMap {
 			select {
 			case ch <- err:
 			default:
@@ -69,9 +71,21 @@ func (s *batch) process() {
 		return
 	}
 
-	for i, res := range result {
+	for _, res := range result {
+		key := s.storage.KeyByValue(res)
+		resCh := s.resultChanMap[key]
+		delete(s.resultChanMap, key)
+
 		select {
-		case s.resultChanList[i] <- res:
+		case resCh <- res:
+		default:
+		}
+	}
+
+	for key := range s.resultChanMap {
+		errCh := s.errorChanMap[key]
+		select {
+		case errCh <- errNotFound:
 		default:
 		}
 	}

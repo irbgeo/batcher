@@ -27,35 +27,38 @@ var (
 	testSet = []testCase{
 		{
 			key:           "test-case-1",
-			expectedValue: "test-actualValue-1",
+			expectedValue: "test-value-1",
 			expectedError: errStorageError,
 		},
 		{
 			key:           "test-case-2",
-			expectedValue: "test-actualValue-2",
+			expectedValue: "test-value-2",
 			expectedError: errStorageError,
 		},
 		{
 			key:           "test-case-3",
-			expectedValue: "test-actualValue-3",
+			expectedValue: "test-value-3",
 			expectedError: errStorageError,
 		},
 		{
 			key:           "test-case-4",
-			expectedValue: "test-actualValue-4",
+			expectedValue: "test-value-4",
 			expectedError: errStorageError,
 		},
 	}
 )
 
 func TestBatch(t *testing.T) {
+	storageMock := mocks.NewStorage(t)
+
 	keys := make([]string, 0, len(testSet))
 	values := make([]any, 0, len(testSet))
 	for _, c := range testSet {
 		keys = append(keys, c.key)
 		values = append(values, c.expectedValue)
+
+		storageMock.On("KeyByValue", c.expectedValue).Return(c.key)
 	}
-	storageMock := mocks.NewStorage(t)
 	storageMock.On("Get", mock.Anything, keys).Return(values, nil)
 
 	b := batcher.New(
@@ -85,6 +88,8 @@ func TestBatch(t *testing.T) {
 func TestNotFullBatch(t *testing.T) {
 	finishIdx := len(testSet) / 2
 
+	storageMock := mocks.NewStorage(t)
+
 	keys := make([]string, 0, len(testSet))
 	values := make([]any, 0, len(testSet))
 	for i, c := range testSet {
@@ -93,8 +98,9 @@ func TestNotFullBatch(t *testing.T) {
 		}
 		keys = append(keys, c.key)
 		values = append(values, c.expectedValue)
+
+		storageMock.On("KeyByValue", c.expectedValue).Return(c.key)
 	}
-	storageMock := mocks.NewStorage(t)
 	storageMock.On("Get", mock.Anything, keys).Return(values, nil)
 
 	b := batcher.New(
@@ -127,6 +133,8 @@ func TestNotFullBatch(t *testing.T) {
 func TestClose(t *testing.T) {
 	finishIdx := len(testSet) / 2
 
+	storageMock := mocks.NewStorage(t)
+
 	keys := make([]string, 0, len(testSet))
 	values := make([]any, 0, len(testSet))
 	for i, c := range testSet {
@@ -135,8 +143,9 @@ func TestClose(t *testing.T) {
 		}
 		keys = append(keys, c.key)
 		values = append(values, c.expectedValue)
+
+		storageMock.On("KeyByValue", c.expectedValue).Return(c.key)
 	}
-	storageMock := mocks.NewStorage(t)
 	storageMock.On("Get", mock.Anything, keys).Return(values, nil)
 
 	b := batcher.New(
@@ -168,13 +177,16 @@ func TestClose(t *testing.T) {
 }
 
 func TestSeveralBatch(t *testing.T) {
+	storageMock := mocks.NewStorage(t)
+
 	keys := make([]string, 0, len(testSet))
 	values := make([]any, 0, len(testSet))
 	for _, c := range testSet {
 		keys = append(keys, c.key)
 		values = append(values, c.expectedValue)
+
+		storageMock.On("KeyByValue", c.expectedValue).Return(c.key)
 	}
-	storageMock := mocks.NewStorage(t)
 	storageMock.On("Get", mock.Anything, keys).Return(values, nil)
 
 	b := batcher.New(

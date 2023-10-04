@@ -18,8 +18,8 @@ type batcher struct {
 
 //go:generate mockery --name=storage --structname=Storage
 type storage interface {
-	// The necessary condition is that the received data is sorted according to the order of keys.
 	Get(ctx context.Context, keys []string) ([]any, error)
+	KeyByValue(v any) string
 }
 
 func New(

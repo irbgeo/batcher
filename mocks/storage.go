@@ -39,6 +39,20 @@ func (_m *Storage) Get(ctx context.Context, keys []string) ([]interface{}, error
 	return r0, r1
 }
 
+// KeyByValue provides a mock function with given fields: v
+func (_m *Storage) KeyByValue(v interface{}) string {
+	ret := _m.Called(v)
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func(interface{}) string); ok {
+		r0 = rf(v)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	return r0
+}
+
 type mockConstructorTestingTNewStorage interface {
 	mock.TestingT
 	Cleanup(func())
